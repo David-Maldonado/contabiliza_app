@@ -1,8 +1,12 @@
 import 'dart:io';
 
 import 'package:contabiliza_app/models/entidad_contable.dart';
+import 'package:contabiliza_app/services/socket_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:pie_chart/pie_chart.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -12,15 +16,33 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<EntidadContable> entidadesContables = [
-    EntidadContable(id: '1', descripcion: 'Caja', cantidad: 100),
-    EntidadContable(id: '2', descripcion: 'Banco', cantidad: 200),
-    EntidadContable(id: '3', descripcion: 'Clientes', cantidad: 300),
-    EntidadContable(id: '4', descripcion: 'Proveedores', cantidad: 400),
-  ];
+  List<EntidadContable> entidadesContables = [];
+
+  @override
+  void initState() {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.socket.on('entidades-contables', (payload) {
+      //se debe de castear el payload a List para poder usar el metodo map
+      entidadesContables = (payload as List)
+          .map((entidad) => EntidadContable.fromJson(entidad))
+          .toList();
+      setState(() {});
+    });
+
+    super.initState();
+  }
+
+// para evitar que se quede escuchando el evento, se debe destruir el listener
+  @override
+  void dispose() {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.socket.off('entidades-contables');
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final socketService = Provider.of<SocketService>(context);
     return Scaffold(
         appBar: AppBar(
           title: const Text(
@@ -29,12 +51,37 @@ class _HomePageState extends State<HomePage> {
           ),
           backgroundColor: Colors.white,
           elevation: 1,
+          actions: [
+            Container(
+              margin: const EdgeInsets.only(right: 10),
+              child: socketService.serverStatus == ServerStatus.Conectado
+                  ? const Icon(
+                      Icons.wifi,
+                      color: Colors.green,
+                    )
+                  : const Icon(
+                      Icons.wifi_off,
+                      color: Colors.red,
+                    ),
+            )
+          ],
         ),
-        body: ListView.builder(
-            itemCount: entidadesContables.length,
-            itemBuilder: (BuildContext context, int index) {
-              return _entidadContableTitle(entidadesContables[index]);
-            }),
+        body: Column(
+          children: [
+            const SizedBox(
+              height: 25,
+            ),
+            _mostrarGrafica(),
+            //expanded es para que tome todo el espacio disponible
+            Expanded(
+              child: ListView.builder(
+                  itemCount: entidadesContables.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    return _entidadContableTitle(entidadesContables[index]);
+                  }),
+            ),
+          ],
+        ),
         floatingActionButton: FloatingActionButton(
           onPressed: addNewEntidadContable,
           elevation: 1,
@@ -43,12 +90,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _entidadContableTitle(EntidadContable entidadContable) {
+    final socketService = Provider.of<SocketService>(context, listen: false);
     return Dismissible(
       key: Key(entidadContable.id),
       direction: DismissDirection.startToEnd,
       onDismissed: (direction) {
-        print('eliminado $direction');
-        print(entidadContable.descripcion);
+        socketService.socket.emit('eliminar-entidad', {
+          'id': entidadContable.id,
+        });
       },
       background: Container(
         color: Colors.red,
@@ -72,7 +121,9 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(fontSize: 20),
           ),
           onTap: () {
-            print(entidadContable.descripcion);
+            socketService.socket.emit('incrementar-entidad', {
+              'id': entidadContable.id,
+            });
           }),
     );
   }
@@ -125,14 +176,29 @@ class _HomePageState extends State<HomePage> {
 
   void addNewEntidadContableList(String descripcion) {
     if (descripcion.isNotEmpty) {
-      final newEntidadContable = EntidadContable(
-          id: DateTime.now().toString(), descripcion: descripcion, cantidad: 0);
-      setState(() {
-        entidadesContables.add(newEntidadContable);
-      });
+      final socketService = Provider.of<SocketService>(context, listen: false);
+      socketService.socket
+          .emit('agregar-entidad', {'descripcion': descripcion});
     }
 
 // esto es para cerrar el dialogo, el context es el contexto de la pantalla
     Navigator.of(context).pop();
+  }
+
+  Widget _mostrarGrafica() {
+    Map<String, double> dataMap = Map();
+
+    for (var entidad in entidadesContables) {
+      dataMap.putIfAbsent(
+          entidad.descripcion, () => entidad.cantidad.toDouble());
+    }
+
+    return SizedBox(
+        width: double.infinity,
+        height: 165,
+        child: PieChart(
+          dataMap: dataMap,
+          chartType: ChartType.ring,
+        ));
   }
 }
