@@ -66,22 +66,11 @@ class _HomePageState extends State<HomePage> {
             )
           ],
         ),
-        body: Column(
-          children: [
-            const SizedBox(
-              height: 25,
-            ),
-            _mostrarGrafica(),
-            //expanded es para que tome todo el espacio disponible
-            Expanded(
-              child: ListView.builder(
-                  itemCount: entidadesContables.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    return _entidadContableTitle(entidadesContables[index]);
-                  }),
-            ),
-          ],
-        ),
+        body: ListView.builder(
+            itemCount: entidadesContables.length,
+            itemBuilder: (BuildContext context, int index) {
+              return _entidadContableTitle(entidadesContables[index]);
+            }),
         floatingActionButton: FloatingActionButton(
           onPressed: addNewEntidadContable,
           elevation: 1,
@@ -185,20 +174,21 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).pop();
   }
 
-  Widget _mostrarGrafica() {
-    Map<String, double> dataMap = Map();
+  // Widget _mostrarGrafica() {
+  //   Map<String, double> dataMap = Map();
 
-    for (var entidad in entidadesContables) {
-      dataMap.putIfAbsent(
-          entidad.descripcion, () => entidad.cantidad.toDouble());
-    }
+  //   for (var entidad in entidadesContables) {
+  //     dataMap.putIfAbsent(
+  //         entidad.descripcion, () => entidad.cantidad.toDouble());
+  //     print(dataMap);
+  //   }
 
-    return SizedBox(
-        width: double.infinity,
-        height: 165,
-        child: PieChart(
-          dataMap: dataMap,
-          chartType: ChartType.ring,
-        ));
-  }
+  //   return SizedBox(
+  //       width: double.infinity,
+  //       height: 165,
+  //       child: PieChart(
+  //         dataMap: dataMap,
+  //         chartType: ChartType.ring,
+  //       ));
+  // }
 }
